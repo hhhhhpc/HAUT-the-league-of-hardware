@@ -1,0 +1,69 @@
+# -*- coding:UTF-8 -*-
+import os
+import re
+
+from bs4 import BeautifulSoup
+import requests
+
+header = {
+    'User-Agent': "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36"
+}   # 将爬虫模拟成浏览器
+target = "http://jiaowu.haut.edu.cn/default2.aspx" # 要爬取的网站，这里是以学校教务为例
+session = requests.Session() # 保持一个会话，可理解为在浏览器中的一个页面进行操错，这样可以确保验证码只发送一次，可以正常登陆
+# 如果不保持会话的话 相当于打开了俩次登陆页面，验证码也会发俩次，导致登陆失败。
+# response = session.get(target)
+# selector = etree.HTML(response.content)
+# __VIEWSTATE = selector.xpath('//*[@id="form1"]/input/@value')[0]   #
+imgUrl = "http://jiaowu.haut.edu.cn/CheckCode.aspx??"   # 学校教务获取验证码的地方网站，发送get请求即可获得。
+imgresponse = session.get(imgUrl, stream=True)
+image = imgresponse.content
+DstDir = os.getcwd() + "\\"
+print("保存验证码到：" + DstDir + "code.jpg" + "\n") # 将验证码保存到code.jpg中
+try:
+    with open(DstDir + "code.jpg", "wb") as jpg:
+        jpg.write(image)
+except IOError:
+    print("IO Error\n")
+finally:
+    jpg.close
+# 手动输入验证码
+StudentID = "201816040309"
+TextBox = "a180158"
+code = str(input("验证码是"))
+print(code)
+data = {
+    "__VIEWSTATE": "dDwxNTMxMDk5Mzc0Ozs+WijGMYiwCPVQi3Y5snzylmy1NL4=",
+    "__VIEWSTATEGENERATOR": "92719903",
+    "txtUserName": StudentID,
+    "TextBox2": TextBox,
+    "txtSecretCode": code,     # 这个是post请求时需要发送的信息 前俩个为教务中的隐藏输入框的内容，检查元素可以发现，这俩个值不变
+    'RadioButtonList1': '学生',    # txtuserName为学生账号 用户名，textbox2为密码 其他复制
+                                 # 使用时只需更改这俩个，其他复制即可
+    'Button1': ""
+}
+
+session.post(url=target, headers=header, data=data)   # 发送post请求登陆
+response = session.get("http://jiaowu.haut.edu.cn/xskbcx.aspx?xh=" + StudentID)
+# 登陆成功后向课表网址发送信息获取课表
+soup = BeautifulSoup(response.text, 'lxml')
+# 将课表变成bs对象
+
+classes = []
+rows = soup.findAll('tr')[4:17]
+for row in rows:
+    columns = row.findAll('td')
+    for column in columns:
+        if column.get('align') == 'Center' and column.text != '\xa0':
+            classes.append(str(column))   # 用bs库和正则将课表匹配出来
+for i in range(len(classes)):
+    index = classes[i].find('>') + 1
+    classes[i] = classes[i][index:-5]
+
+# 合为一个字符串
+# classes = '<br/>'.join(classes)
+
+# 按分隔符拆开为列表
+# p = re.compile()
+for i in classes:
+    t = re.sub(r'<br/>', "", i)
+    print(t)
